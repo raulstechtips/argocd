@@ -107,3 +107,12 @@ ingressRoute:
       namespace: default
   # Required when enabled: name of the existing TLS Secret.
   tlsSecretName: ""
+
+# envsubst CMP plugin resources (ConfigMap, RBAC, InfisicalSecrets). Off by default.
+envsubst:
+  enabled: false
+  infisical:
+    # Required when envsubst.enabled=true.
+    hostAPI: ""
+    projectSlug: ""
+    envSlug: ""

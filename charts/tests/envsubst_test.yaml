@@ -1,0 +1,137 @@
+suite: envsubst templates
+templates:
+  - templates/envsubst/cmp-configmap.yaml
+  - templates/envsubst/cmp-rbac.yaml
+  - templates/envsubst/app-env-secret.yaml
+  - templates/envsubst/harbor-secret.yaml
+tests:
+  - it: renders nothing when disabled
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: templates/envsubst/cmp-configmap.yaml
+      - hasDocuments:
+          count: 0
+        template: templates/envsubst/cmp-rbac.yaml
+      - hasDocuments:
+          count: 0
+        template: templates/envsubst/app-env-secret.yaml
+      - hasDocuments:
+          count: 0
+        template: templates/envsubst/harbor-secret.yaml
+
+  - it: renders the ConfigMap when enabled
+    set: &on
+      envsubst.enabled: true
+      envsubst.infisical.hostAPI: https://infisical.example.test/api
+      envsubst.infisical.projectSlug: fake-project
+      envsubst.infisical.envSlug: fake-env
+    template: templates/envsubst/cmp-configmap.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: ConfigMap
+      - equal:
+          path: metadata.name
+          value: cmp-kustomize-envsubst
+      - matchRegex:
+          path: data["plugin.yaml"]
+          pattern: "kind: ConfigManagementPlugin"
+
+  - it: renders ClusterRole and ClusterRoleBinding when enabled
+    set: *on
+    template: templates/envsubst/cmp-rbac.yaml
+    asserts:
+      - hasDocuments:
+          count: 2
+      - isKind:
+          of: ClusterRole
+        documentIndex: 0
+      - equal:
+          path: metadata.name
+          value: argocd-repo-server-plugin
+        documentIndex: 0
+      - isKind:
+          of: ClusterRoleBinding
+        documentIndex: 1
+      - equal:
+          path: metadata.name
+          value: argocd-repo-server-plugin
+        documentIndex: 1
+
+  - it: renders the app-env InfisicalSecret with the 3 values
+    set: *on
+    template: templates/envsubst/app-env-secret.yaml
+    asserts:
+      - isKind:
+          of: InfisicalSecret
+      - isAPIVersion:
+          of: secrets.infisical.com/v1alpha1
+      - equal:
+          path: metadata.name
+          value: infisical-secret-argocd-app-env
+      - equal:
+          path: spec.hostAPI
+          value: https://infisical.example.test/api
+      - equal:
+          path: spec.authentication.universalAuth.secretsScope.projectSlug
+          value: fake-project
+      - equal:
+          path: spec.authentication.universalAuth.secretsScope.envSlug
+          value: fake-env
+      - equal:
+          path: spec.managedKubeSecretReferences[0].template.data.ARGOCD_ENV_DOMAIN
+          value: "{{ .DOMAIN.Value }}"
+
+  - it: renders the harbor InfisicalSecret with the 3 values
+    set: *on
+    template: templates/envsubst/harbor-secret.yaml
+    asserts:
+      - isKind:
+          of: InfisicalSecret
+      - isAPIVersion:
+          of: secrets.infisical.com/v1alpha1
+      - equal:
+          path: metadata.name
+          value: infisical-secret-argocd-harbor-secrets
+      - equal:
+          path: spec.hostAPI
+          value: https://infisical.example.test/api
+      - equal:
+          path: spec.authentication.universalAuth.secretsScope.projectSlug
+          value: fake-project
+      - equal:
+          path: spec.authentication.universalAuth.secretsScope.envSlug
+          value: fake-env
+
+  # Helm stops at the first failing template; harbor-secret.yaml is the one it reports.
+  - it: fails without hostAPI
+    set:
+      envsubst.enabled: true
+      envsubst.infisical.projectSlug: fake-project
+      envsubst.infisical.envSlug: fake-env
+    template: templates/envsubst/harbor-secret.yaml
+    asserts:
+      - failedTemplate:
+          errorMessage: "envsubst.infisical.hostAPI is required when envsubst.enabled=true"
+
+  - it: fails without projectSlug
+    set:
+      envsubst.enabled: true
+      envsubst.infisical.hostAPI: https://infisical.example.test/api
+      envsubst.infisical.envSlug: fake-env
+    template: templates/envsubst/harbor-secret.yaml
+    asserts:
+      - failedTemplate:
+          errorMessage: "envsubst.infisical.projectSlug is required when envsubst.enabled=true"
+
+  - it: fails without envSlug
+    set:
+      envsubst.enabled: true
+      envsubst.infisical.hostAPI: https://infisical.example.test/api
+      envsubst.infisical.projectSlug: fake-project
+    template: templates/envsubst/harbor-secret.yaml
+    asserts:
+      - failedTemplate:
+          errorMessage: "envsubst.infisical.envSlug is required when envsubst.enabled=true"

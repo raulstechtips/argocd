@@ -1,0 +1,28 @@
+{{- if .Values.envsubst.enabled }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: argocd-repo-server-plugin
+rules:
+  - apiGroups:
+      - argoproj.io
+    resources:
+      - configmanagementplugins
+    verbs:
+      - get
+      - list
+      - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: argocd-repo-server-plugin
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: argocd-repo-server-plugin
+subjects:
+  - kind: ServiceAccount
+    name: argocd-repo-server
+    namespace: {{ .Release.Namespace }}
+{{- end }}
