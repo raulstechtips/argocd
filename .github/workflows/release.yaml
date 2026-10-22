@@ -67,6 +67,8 @@ jobs:
           helm template argocd charts -n argocd -f charts/ci/all-on-values.yaml > rendered.yaml
           mkdir -p "$RUNNER_TEMP/manifests"
           cp rendered.yaml "$RUNNER_TEMP/manifests/rendered.yaml"
+      # apiextensions.k8s.io/v1/CustomResourceDefinition: no published schema
+      # in the default location or the datreeio CRDs catalog.
       - name: Check Kubernetes schemas
         run: |
           curl -fsSL -o "$RUNNER_TEMP/kubeconform.tar.gz" \
@@ -74,7 +76,7 @@ jobs:
           echo "95f14e87aa28c09d5941f11bd024c1d02fdc0303ccaa23f61cef67bc92619d73  $RUNNER_TEMP/kubeconform.tar.gz" | sha256sum -c -
           tar -xzf "$RUNNER_TEMP/kubeconform.tar.gz" -C "$RUNNER_TEMP" kubeconform
           export PATH="$RUNNER_TEMP:$PATH"
-          kubeconform -strict -summary -schema-location default -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' -skip InfisicalSecret,InfisicalStaticSecret rendered.yaml
+          kubeconform -strict -summary -schema-location default -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' -skip InfisicalSecret,InfisicalStaticSecret,apiextensions.k8s.io/v1/CustomResourceDefinition rendered.yaml
       # The step prints only the file and the line, never the value.
       - name: No IP addresses, private keys or UUIDs
         run: |
