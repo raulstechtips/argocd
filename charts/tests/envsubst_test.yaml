@@ -35,9 +35,37 @@ tests:
       - equal:
           path: metadata.name
           value: cmp-kustomize-envsubst
-      - matchRegex:
+      - equal:
           path: data["plugin.yaml"]
-          pattern: "kind: ConfigManagementPlugin"
+          value: |
+            apiVersion: argoproj.io/v1alpha1
+            kind: ConfigManagementPlugin
+            metadata:
+              name: kustomize-envsubst
+            spec:
+              generate:
+                command: ["bash", "-c"]
+                args:
+                  - |
+                    set -eo pipefail
+                    SHELL_FORMAT=$(printf '${%s} ' ${!ARGOCD_ENV_*})
+                    # 1) Pre-template kustomization file
+                    if [ -f kustomization.yaml ] || [ -f Kustomization ]; then
+                      K_FILE=$( [ -f kustomization.yaml ] && echo kustomization.yaml || echo Kustomization )
+                      TMP=$(mktemp)
+                      envsubst "$SHELL_FORMAT" < "$K_FILE" > "$TMP"
+                      mv "$TMP" "$K_FILE"
+                    fi
+                    # 2) Pre-template ALL values files referenced in kustomization
+                    find . -path "*/values/*.yaml" -type f | while read -r values_file; do
+                      TMP=$(mktemp)
+                      envsubst "$SHELL_FORMAT" < "$values_file" > "$TMP"
+                      mv "$TMP" "$values_file"
+                    done
+                    # 3) Now run kustomize build (Helm will use already-substituted values)
+                    kustomize build --enable-helm --load-restrictor LoadRestrictionsNone . | envsubst "$SHELL_FORMAT"
+              discover:
+                fileName: kustomization.yaml
 
   - it: renders ClusterRole and ClusterRoleBinding when enabled
     set: *on
