@@ -81,3 +81,12 @@ argo-cd:
       applicationsetcontroller.namespaces: null
       application.namespaces: null
       controller.ignore.normalizer.jq.timeout: null
+
+# envsubst CMP plugin resources (ConfigMap, RBAC, InfisicalSecrets). Off by default.
+envsubst:
+  enabled: false
+  infisical:
+    # Required when envsubst.enabled=true.
+    hostAPI: ""
+    projectSlug: ""
+    envSlug: ""
