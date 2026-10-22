@@ -1,0 +1,28 @@
+envsubst:
+  enabled: true
+  infisical:
+    hostAPI: https://infisical.example.test/api
+    projectSlug: fake
+    envSlug: dev
+infisical:
+  projectSlug: fake
+externalRegistrySecrets:
+  - name: fake-helm
+    environmentSlug: dev
+    secretPath: /fake/helm
+    url: oci://registry.example.test/charts
+    usernameKey: HELM_USER
+    passwordKey: HELM_TOKEN
+    type: helm
+    enableOCI: true
+  - name: fake-git
+    environmentSlug: dev
+    secretPath: /fake/git
+    url: https://git.example.test/fake/repo.git
+    usernameKey: GIT_USER
+    passwordKey: GIT_TOKEN
+    type: git
+ingressRoute:
+  enabled: true
+  host: argocd.example.test
+  tlsSecretName: fake-tls
