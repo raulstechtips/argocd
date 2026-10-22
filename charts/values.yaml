@@ -81,3 +81,15 @@ argo-cd:
       applicationsetcontroller.namespaces: null
       application.namespaces: null
       controller.ignore.normalizer.jq.timeout: null
+
+# Infisical connection used by externalRegistrySecrets.
+infisical:
+  authRef:
+    name: infisical-universal
+    namespace: infisical
+  projectSlug: ""
+
+# Repository credentials synced from Infisical. Each entry needs:
+# name, environmentSlug, secretPath, url, usernameKey, passwordKey.
+# Optional: type (helm|git, default helm), enableOCI (boolean).
+externalRegistrySecrets: []
