@@ -72,6 +72,10 @@ changed="$(printf '%s\n' "$bare" | jq '.spec.template.spec.containers += [{name:
 check "missing sidecar fails" 1 "$changed" "$bare"
 grep -Fxq 'FIX missing container: kustomize-envsubst' "$tmp/output"
 
+ordered="$(printf '%s\n' "$bare" | jq '.spec.template.spec.containers[0].env=[{name:"BASE",value:"before"},{name:"DEPENDENT",value:"$(BASE)"}]')"
+reversed="$(printf '%s\n' "$ordered" | jq '.spec.template.spec.containers[0].env |= reverse')"
+check "reordered dependent env stays visible" 1 "$ordered" "$reversed"
+
 export TEST_KIND=StatefulSet
 bare="$(printf '%s\n' "$bare" | jq '.kind="StatefulSet" | .spec.serviceName="example"')"
 defaults="$(printf '%s\n' "$bare" | jq '

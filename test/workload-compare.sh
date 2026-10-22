@@ -57,9 +57,15 @@ for input in live rendered; do
         if .secret.defaultMode == 420 then del(.secret.defaultMode) else . end
       ) else . end
     ) |
-    walk(if type == "array" and length > 0 and
-      all(.[]; type == "object" and has("name"))
-      then sort_by(.name) else . end)
+    # Sort only collections whose order has no meaning. Keep env, args, command
+    # and initContainers in order: later entries can depend on earlier ones.
+    .template.spec |= (
+      .containers |= (map(
+        if has("volumeMounts") then .volumeMounts |= sort_by(.name) else . end |
+        if has("ports") then .ports |= sort_by(.name // "") else . end
+      ) | sort_by(.name)) |
+      if has("volumes") then .volumes |= sort_by(.name) else . end
+    )
   ' "$tmp/$input" > "$tmp/$input-normalized"
 done
 jq -nr --slurpfile live "$tmp/live" --slurpfile rendered "$tmp/rendered" '
