@@ -19,7 +19,7 @@ oci://ghcr.io/raulstechtips/charts/argocd
 | --- | --- |
 | `charts/` | The Helm chart. `Chart.yaml`, `Chart.lock`, `values.yaml` and `values.schema.json`. |
 | `charts/templates/` | Our own templates: `external-registry-secrets.yaml` and `ingressroute.yaml`. |
-| `charts/templates/envsubst/` | The envsubst CMP plugin resources. This directory is temporary. Section 10 tells you how to remove it. |
+| `charts/templates/envsubst/` | The envsubst CMP plugin resources. This directory is temporary. Section 11 tells you how to remove it. |
 | `charts/tests/` | The helm-unittest test files (`*_test.yaml`). |
 | `charts/ci/` | Values files for CI. `all-on-values.yaml` turns on all features with fake values. |
 | `.github/workflows/` | `release.yaml` tests, versions and publishes the chart. `retention.yaml` deletes old branch versions. |
@@ -99,7 +99,7 @@ If the branch name is bad, the `version` job fails with this message:
 Branch "<name>" must be <type>/<KEY>-<number>[-text], for example feature/DEVSECOPS-54-argocd-chart.
 ```
 
-To fix the name, rename the branch and push again:
+To fix the name, rename the branch. Then push the branch again:
 
 ```bash
 git branch -m feature/DEVSECOPS-54-argocd-chart
@@ -139,7 +139,8 @@ Do these steps when you change `charts/`:
    Example result: `3.0.0-main-abc1234-13`.
 2. Open `charts/Chart.yaml`.
 3. Set `version` to a higher value. Example: `3.0.1`.
-4. Commit and push.
+4. Commit the change.
+5. Push the commit.
 
 If the version is not higher, the `version` job fails with this message:
 
@@ -187,6 +188,9 @@ Run these tests before you push. The `test` job in CI runs the same commands.
 | --- | --- |
 | Helm | 3.x |
 | helm-unittest plugin | 0.3.1 |
+| kubeconform | 0.6.7 |
+| actionlint | 1.7.12 |
+| ShellCheck | 0.11.0 or newer |
 
 Install the plugin one time:
 
@@ -201,6 +205,51 @@ helm plugin list
 ```
 
 Expected result: the list shows `unittest` with version `0.3.1`.
+
+Install kubeconform and actionlint one time.
+Each command downloads a pinned release and checks its SHA-256 value before it unpacks the file.
+Use the Linux values on Linux (amd64) and the macOS values on macOS (Apple silicon):
+
+```bash
+mkdir -p "$HOME/.local/bin"
+TMP="$(mktemp -d)"
+
+# Linux amd64
+curl -fsSL -o "$TMP/kubeconform.tar.gz" https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz
+echo "95f14e87aa28c09d5941f11bd024c1d02fdc0303ccaa23f61cef67bc92619d73  $TMP/kubeconform.tar.gz" | shasum -a 256 -c -
+curl -fsSL -o "$TMP/actionlint.tar.gz" https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz
+echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $TMP/actionlint.tar.gz" | shasum -a 256 -c -
+
+# macOS arm64
+curl -fsSL -o "$TMP/kubeconform.tar.gz" https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-darwin-arm64.tar.gz
+echo "cbb47d938a8d18eb5f79cb33663b2cecdee0c8ac0bf562ebcfca903df5f0802f  $TMP/kubeconform.tar.gz" | shasum -a 256 -c -
+curl -fsSL -o "$TMP/actionlint.tar.gz" https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_darwin_arm64.tar.gz
+echo "aba9ced2dee8d27fecca3dc7feb1a7f9a52caefa1eb46f3271ea66b6e0e6953f  $TMP/actionlint.tar.gz" | shasum -a 256 -c -
+
+tar -xzf "$TMP/kubeconform.tar.gz" -C "$HOME/.local/bin" kubeconform
+tar -xzf "$TMP/actionlint.tar.gz" -C "$HOME/.local/bin" actionlint
+rm -rf "$TMP"
+```
+
+Expected result: each `shasum` line ends with `OK`. If a line shows `FAILED`, delete the file and do not use it.
+Make sure that `$HOME/.local/bin` is in your `PATH`.
+
+Install ShellCheck. The ShellCheck project does not publish checksum files, so use your package manager:
+
+```bash
+brew install shellcheck          # macOS
+sudo apt-get install -y shellcheck   # Debian and Ubuntu
+```
+
+Make sure that the tools are installed:
+
+```bash
+kubeconform -v
+actionlint -version
+shellcheck --version
+```
+
+Expected result: the versions are `v0.6.7`, `1.7.12` and `0.11.0` or newer.
 
 ### 8.2 Commands
 
@@ -246,12 +295,37 @@ Run each command from the repository root.
 
    Expected result: the command exits with code 0 and `rendered.yaml` contains the manifests. Do not commit `rendered.yaml`.
 
+6. Check the rendered manifests against the Kubernetes schemas:
+
+   ```bash
+   kubeconform -strict -summary -schema-location default -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' -skip InfisicalSecret,InfisicalStaticSecret,apiextensions.k8s.io/v1/CustomResourceDefinition rendered.yaml
+   ```
+
+   Expected result: the summary shows `Invalid: 0, Errors: 0` and the command exits with code 0.
+   The skip list is necessary because no public schema exists for these kinds. The check does not validate the Infisical resources and the three Argo CD CustomResourceDefinitions.
+
+7. Check the workflow files:
+
+   ```bash
+   actionlint .github/workflows/release.yaml .github/workflows/retention.yaml
+   ```
+
+   Expected result: actionlint prints no output and exits with code 0. When ShellCheck is in your `PATH`, actionlint also checks the shell code inside the workflows.
+
+8. Check the shell scripts:
+
+   ```bash
+   shellcheck scripts/version.sh scripts/retention.sh test/retention_test.sh
+   ```
+
+   Expected result: ShellCheck prints no output and exits with code 0.
+
 ### 8.3 Trivy
 
 CI scans `rendered.yaml` with Trivy for HIGH and CRITICAL misconfigurations.
 Trivy is a warning only. It does not stop the release.
 The job summary shows the Trivy table and a warning with the number of findings.
-Read the findings and fix them when you can.
+Read the findings. Fix them when you can.
 
 ## 9. Retention
 
@@ -292,8 +366,9 @@ The envsubst plugin is temporary. Do these steps in this sequence.
 1. Open `apps/dev/argocd.yaml`.
 2. Delete the line `envsubst.enabled: true`.
 3. Delete the sidecar block.
-4. Open a pull request and merge it.
-5. Make sure that Argo CD syncs the `argocd` Application without errors.
+4. Open a pull request.
+5. Merge the pull request.
+6. Make sure that Argo CD syncs the `argocd` Application without errors.
 
 Rollback: revert that pull request.
 
@@ -304,4 +379,5 @@ Rollback: revert that pull request.
 3. Delete `charts/tests/envsubst_test.yaml`.
 4. Increase `version` in `charts/Chart.yaml` (see section 6).
 5. Run the local tests (see section 8).
-6. Push and merge. The workflow releases a new chart version.
+6. Push the branch.
+7. Merge the pull request. The workflow releases a new chart version.
