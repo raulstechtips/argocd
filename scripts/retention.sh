@@ -5,7 +5,9 @@
 #                       RETENTION_NOW=<epoch seconds> replaces the current time.
 set -euo pipefail
 
-OWNER_PATH="/users/raulstechtips/packages/container/charts%2Fargocd/versions"
+# raulstechtips is a GitHub organization: use the orgs API path. The user-scoped path returns 404 for an org.
+PKG_OWNER_PATH="orgs/raulstechtips"
+OWNER_PATH="/${PKG_OWNER_PATH}/packages/container/charts%2Fargocd/versions"
 MAIN_RE='^[0-9]+\.[0-9]+\.[0-9]+-main-[0-9a-f]{7}-[0-9]+$'
 MAX_AGE_SECONDS=604800
 

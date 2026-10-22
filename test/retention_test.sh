@@ -9,6 +9,12 @@ mkdir -p "$T/bin"
 cat >"$T/bin/gh" <<'STUB'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >>"$STUB_LOG"
+# Like the real API: raulstechtips is an organization, so /users/ paths return 404.
+case " $* " in
+  *" /users/"*) echo "gh: Not Found (HTTP 404)" >&2; exit 1 ;;
+  *" /orgs/raulstechtips/packages/container/charts%2Fargocd/versions"*) ;;
+  *) echo "gh: unexpected path (HTTP 404)" >&2; exit 1 ;;
+esac
 case " $* " in
   *" DELETE "*) exit 0 ;;
 esac
@@ -85,7 +91,14 @@ echo '{"message":"x"}' >"$bad"; STUB_FIXTURE="$bad" run bash "$script" --apply
 check "non-array nonzero" "$(nonzero "$rc")" yes
 check "non-array no DELETE" "$(deleted)" 0
 
-# 8 mode argument required
+# 8 org API path: a /users/ call is a defect (404 on an org would hide a no-op retention)
+run bash "$script" --apply
+check "no /users/ path called" "$(grep -c '/users/' "$STUB_LOG" || true)" 0
+check "list uses orgs path" "$(grep -c '^api --paginate /orgs/raulstechtips/packages/container/charts%2Fargocd/versions?' "$STUB_LOG")" 1
+check "delete uses orgs path" "$(grep -c '^api --method DELETE /orgs/raulstechtips/packages/container/charts%2Fargocd/versions/10[45]$' "$STUB_LOG")" 2
+check "script has no /users/ path" "$(grep -c 'users/' "$script" || true)" 0
+
+# 9 mode argument required
 run bash "$script"
 check "no mode rc" "$rc" 2
 
