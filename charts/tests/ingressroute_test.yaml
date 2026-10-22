@@ -1,0 +1,68 @@
+suite: ingressroute
+templates:
+  - templates/ingressroute.yaml
+tests:
+  - it: renders nothing when disabled
+    asserts:
+      - hasDocuments:
+          count: 0
+  - it: renders one IngressRoute with host in both match rules
+    set:
+      ingressRoute.enabled: true
+      ingressRoute.host: argocd.example.test
+      ingressRoute.tlsSecretName: fake-tls
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: IngressRoute
+      - equal:
+          path: metadata.annotations["kubernetes.io/ingress.class"]
+          value: traefik-external
+      - matchRegex:
+          path: spec.routes[0].match
+          pattern: Host\(`argocd\.example\.test`\)
+      - matchRegex:
+          path: spec.routes[1].match
+          pattern: Host\(`argocd\.example\.test`\) && Header\(`Content-Type`, `application/grpc`\)
+      - equal:
+          path: spec.routes[0].priority
+          value: 10
+      - equal:
+          path: spec.routes[1].priority
+          value: 11
+      - equal:
+          path: spec.routes[1].services[0]
+          value:
+            name: argocd-server
+            port: 80
+      - equal:
+          path: spec.routes[0].middlewares[0].name
+          value: default-headers
+      - equal:
+          path: spec.tls.secretName
+          value: fake-tls
+  - it: takes ingress class from values
+    set:
+      ingressRoute.enabled: true
+      ingressRoute.host: argocd.example.test
+      ingressRoute.tlsSecretName: fake-tls
+      ingressRoute.ingressClass: other-class
+    asserts:
+      - equal:
+          path: metadata.annotations["kubernetes.io/ingress.class"]
+          value: other-class
+  - it: fails when enabled without host
+    set:
+      ingressRoute.enabled: true
+      ingressRoute.tlsSecretName: fake-tls
+    asserts:
+      - failedTemplate:
+          errorMessage: ingressRoute.host is required when ingressRoute.enabled is true
+  - it: fails when enabled with host but without tlsSecretName
+    set:
+      ingressRoute.enabled: true
+      ingressRoute.host: argocd.example.test
+    asserts:
+      - failedTemplate:
+          errorMessage: ingressRoute.tlsSecretName is required when ingressRoute.enabled is true

@@ -81,3 +81,17 @@ argo-cd:
       applicationsetcontroller.namespaces: null
       application.namespaces: null
       controller.ignore.normalizer.jq.timeout: null
+
+# Traefik IngressRoute for argocd-server. Off by default.
+ingressRoute:
+  enabled: false
+  # Required when enabled: public host name of Argo CD.
+  host: ""
+  ingressClass: traefik-external
+  entryPoints:
+    - websecure
+  middlewares:
+    - name: default-headers
+      namespace: default
+  # Required when enabled: name of the existing TLS Secret.
+  tlsSecretName: ""
