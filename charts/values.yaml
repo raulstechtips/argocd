@@ -1,0 +1,83 @@
+argo-cd:
+  # Source: v3.0.0 commands used by install.yaml in kustomization.yaml.
+  # The chart uses text, but the binaries use JSON by default.
+  global:
+    logging:
+      format: json
+  # Ticket Example 1: keep CRDs and enable HA Redis.
+  crds:
+    keep: true
+  redis-ha:
+    enabled: true
+  # Ticket Example 1: application controller and API server replicas.
+  controller:
+    replicas: 1
+  server:
+    replicas: 2
+  repoServer:
+    # Ticket Example 1: repo-server replicas.
+    replicas: 2
+    # Source: overlays/repo-server-tools.yaml.
+    resources:
+      requests:
+        cpu: 10m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+    # Source: overlays/repo-server-tools.yaml.
+    envFrom:
+      - secretRef:
+          name: argocd-app-env
+      - secretRef:
+          name: argocd-harbor-secrets
+    # Source: overlays/repo-server-tools.yaml.
+    env:
+      - name: ARGOCD_CMP_SERVER
+        value: "1"
+  configs:
+    # Source: overlays/argocd-cm.yaml and the v3.0.0 install.yaml
+    # in kustomization.yaml. Remove chart defaults absent from that ConfigMap.
+    cm:
+      kustomize.buildOptions: --enable-helm
+      application.instanceLabelKey: null
+      application.sync.impersonation.enabled: null
+      server.rbac.log.enforce.enable: null
+      exec.enabled: null
+      admin.enabled: null
+      timeout.reconciliation: null
+      timeout.hard.reconciliation: null
+      statusbadge.enabled: null
+      # An empty value also removes the URL added by the chart helper.
+      url: ""
+    # Source: v3.0.0 install.yaml in kustomization.yaml; its RBAC data is null.
+    rbac:
+      policy.default: null
+      policy.csv: null
+      scopes: null
+      policy.matchMode: null
+    # Source: overlays/argocd-cmd-params-cm.yaml.
+    # Remove optional chart defaults; keep helper presets for comparison.
+    params:
+      server.insecure: "true"
+      # Source: v3.0.0 common.DefaultDexServerAddr; omit the chart's URL scheme.
+      server.dex.server: argocd-dex-server:5556
+      otlp.address: null
+      controller.status.processors: null
+      controller.operation.processors: null
+      controller.self.heal.timeout.seconds: null
+      controller.repo.server.timeout.seconds: null
+      controller.sync.timeout.seconds: null
+      server.basehref: null
+      server.rootpath: null
+      server.staticassets: null
+      server.disable.auth: null
+      server.enable.gzip: null
+      server.enable.proxy.extension: null
+      server.x.frame.options: null
+      reposerver.parallelism.limit: null
+      applicationsetcontroller.policy: null
+      applicationsetcontroller.enable.progressive.syncs: null
+      applicationsetcontroller.namespaces: null
+      application.namespaces: null
+      controller.ignore.normalizer.jq.timeout: null

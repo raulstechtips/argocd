@@ -1,0 +1,10 @@
+apiVersion: v2
+name: argocd
+description: Argo CD wrapper chart with migrated cluster configuration.
+type: application
+version: 3.0.0
+appVersion: "v3.0.0"
+dependencies:
+  - name: argo-cd
+    version: 8.0.1
+    repository: https://argoproj.github.io/argo-helm
