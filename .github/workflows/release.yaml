@@ -1,0 +1,164 @@
+name: release
+
+on:
+  push:
+    branches: ['**']
+    tags-ignore: ['**']
+  workflow_dispatch:
+
+concurrency: release-${{ github.ref }}
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+      - name: Install version tools
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/oras.tar.gz" \
+            https://github.com/oras-project/oras/releases/download/v1.2.3/oras_1.2.3_linux_amd64.tar.gz
+          echo "b4efc97a91f471f323f193ea4b4d63d8ff443ca3aab514151a30751330852827  $RUNNER_TEMP/oras.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/oras.tar.gz" -C "$RUNNER_TEMP" oras
+          curl -fsSL -o "$RUNNER_TEMP/yq" \
+            https://github.com/mikefarah/yq/releases/download/v4.45.1/yq_linux_amd64
+          echo "654d2943ca1d3be2024089eb4f270f4070f491a0610481d128509b2834870049  $RUNNER_TEMP/yq" | sha256sum -c -
+          chmod +x "$RUNNER_TEMP/yq"
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+      - name: Log in for the version baseline
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          ACTOR: ${{ github.actor }}
+        run: echo "$GITHUB_TOKEN" | oras login ghcr.io -u "$ACTOR" --password-stdin
+      - name: Check and compute version
+        id: version
+        run: bash scripts/version.sh
+
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: azure/setup-helm@b9e51907a09c216f16ebe8536097933489208112 # v4.3.0
+        with:
+          version: v3.18.4
+      - name: Install Helm unit tests
+        run: helm plugin install https://github.com/helm-unittest/helm-unittest.git --version v0.3.1
+      - name: Test and render the chart
+        run: |
+          helm dependency build charts
+          helm lint --strict charts
+          helm lint --strict charts -f charts/ci/all-on-values.yaml
+          helm unittest charts
+          helm template argocd charts -n argocd -f charts/ci/all-on-values.yaml > rendered.yaml
+          mkdir -p "$RUNNER_TEMP/manifests"
+          cp rendered.yaml "$RUNNER_TEMP/manifests/rendered.yaml"
+      # apiextensions.k8s.io/v1/CustomResourceDefinition: no published schema
+      # in the default location or the datreeio CRDs catalog.
+      - name: Check Kubernetes schemas
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/kubeconform.tar.gz" \
+            https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz
+          echo "95f14e87aa28c09d5941f11bd024c1d02fdc0303ccaa23f61cef67bc92619d73  $RUNNER_TEMP/kubeconform.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/kubeconform.tar.gz" -C "$RUNNER_TEMP" kubeconform
+          export PATH="$RUNNER_TEMP:$PATH"
+          kubeconform -strict -summary -schema-location default -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' -skip InfisicalSecret,InfisicalStaticSecret,apiextensions.k8s.io/v1/CustomResourceDefinition rendered.yaml
+      # The step prints only the file and the line, never the value.
+      - name: No IP addresses, private keys or UUIDs
+        run: |
+          FOUND=$(git ls-files -z | xargs -0 grep -nIE \
+            -e '(^|[^0-9.])([0-9]{1,3}\.){3}[0-9]{1,3}([^0-9.]|$)' \
+            -e '-----BEGIN [A-Z ]*PRIVATE KEY-----' \
+            -e '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}' \
+            | cut -d: -f1,2 || true)
+          if [ -n "$FOUND" ]; then
+            printf '%s\n' "$FOUND" | while IFS=: read -r F L; do
+              echo "::error file=$F,line=$L::Remove this value. IP addresses, private keys and UUIDs belong in Infisical."
+            done
+            exit 1
+          fi
+          echo "No IP address, private key or UUID found."
+      - name: Lint the workflow and shell
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq shellcheck
+          curl -fsSL -o "$RUNNER_TEMP/actionlint.tar.gz" \
+            https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz
+          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $RUNNER_TEMP/actionlint.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP" actionlint
+          "$RUNNER_TEMP/actionlint" .github/workflows/release.yaml
+          shellcheck scripts/version.sh
+      - name: Install Trivy
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/trivy.tar.gz" \
+            https://github.com/aquasecurity/trivy/releases/download/v0.70.0/trivy_0.70.0_Linux-64bit.tar.gz
+          echo "8b4376d5d6befe5c24d503f10ff136d9e0c49f9127a4279fd110b727929a5aa9  $RUNNER_TEMP/trivy.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/trivy.tar.gz" -C "$RUNNER_TEMP" trivy
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+      - name: Scan rendered manifests
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: v0.70.0
+          skip-setup-trivy: 'true'
+          cache: 'false'
+          scan-type: config
+          scan-ref: ${{ runner.temp }}/manifests
+          severity: HIGH,CRITICAL
+          exit-code: '0'
+          format: table
+          output: ${{ runner.temp }}/trivy.txt
+      - name: Report scan findings
+        run: |
+          COUNT=$(awk '/^Failures: / {total += $2} END {print total+0}' "$RUNNER_TEMP/trivy.txt")
+          if [ "$COUNT" -gt 0 ]; then
+            echo "::warning::Trivy found $COUNT misconfigurations"
+          fi
+          {
+            echo "### Trivy: $COUNT HIGH or CRITICAL misconfigurations"
+            echo '```text'
+            cat "$RUNNER_TEMP/trivy.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [version, test]
+    permissions:
+      contents: read
+      packages: write
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: azure/setup-helm@b9e51907a09c216f16ebe8536097933489208112 # v4.3.0
+        with:
+          version: v3.18.4
+      - name: Package the chart
+        run: |
+          helm dependency build charts
+          helm package charts --version "$VERSION"
+      - name: Log in to GHCR
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          ACTOR: ${{ github.actor }}
+        run: echo "$GITHUB_TOKEN" | helm registry login ghcr.io -u "$ACTOR" --password-stdin
+      - name: Push and check the chart
+        run: |
+          helm push "argocd-$VERSION.tgz" oci://ghcr.io/raulstechtips/charts
+          helm show chart oci://ghcr.io/raulstechtips/charts/argocd --version "$VERSION"
+          echo "oci://ghcr.io/raulstechtips/charts/argocd:$VERSION" >> "$GITHUB_STEP_SUMMARY"
