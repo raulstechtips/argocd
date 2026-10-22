@@ -255,7 +255,15 @@ Expected result: the versions are `v0.6.7`, `1.7.12` and `0.11.0` or newer.
 
 Run each command from the repository root.
 
-1. Download the chart dependencies:
+1. Add the Argo Helm repository:
+
+   ```bash
+   helm repo add argo https://argoproj.github.io/argo-helm
+   ```
+
+   Expected result: `"argo" has been added to your repositories`.
+
+2. Download the chart dependencies:
 
    ```bash
    helm dependency build charts
@@ -263,7 +271,7 @@ Run each command from the repository root.
 
    Expected result: Helm writes the `argo-cd` package to `charts/charts/`. The command exits with code 0.
 
-2. Lint the chart with the default values:
+3. Lint the chart with the default values:
 
    ```bash
    helm lint --strict charts
@@ -271,7 +279,7 @@ Run each command from the repository root.
 
    Expected result: `1 chart(s) linted, 0 chart(s) failed`.
 
-3. Lint the chart with all features on:
+4. Lint the chart with all features on:
 
    ```bash
    helm lint --strict charts -f charts/ci/all-on-values.yaml
@@ -279,7 +287,7 @@ Run each command from the repository root.
 
    Expected result: `1 chart(s) linted, 0 chart(s) failed`.
 
-4. Run the unit tests:
+5. Run the unit tests:
 
    ```bash
    helm unittest charts
@@ -287,7 +295,7 @@ Run each command from the repository root.
 
    Expected result: the summary lines `Test Suites:` and `Tests:` show only `passed` values. Example: `Tests: 16 passed, 16 total`.
 
-5. Render the chart with all features on:
+6. Render the chart with all features on:
 
    ```bash
    helm template argocd charts -n argocd -f charts/ci/all-on-values.yaml > rendered.yaml
@@ -295,7 +303,7 @@ Run each command from the repository root.
 
    Expected result: the command exits with code 0 and `rendered.yaml` contains the manifests. Do not commit `rendered.yaml`.
 
-6. Check the rendered manifests against the Kubernetes schemas:
+7. Check the rendered manifests against the Kubernetes schemas:
 
    ```bash
    kubeconform -strict -summary -schema-location default -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' -skip InfisicalSecret,InfisicalStaticSecret,apiextensions.k8s.io/v1/CustomResourceDefinition rendered.yaml
@@ -304,7 +312,7 @@ Run each command from the repository root.
    Expected result: the summary shows `Invalid: 0, Errors: 0` and the command exits with code 0.
    The skip list is necessary because no public schema exists for these kinds. The check does not validate the Infisical resources and the three Argo CD CustomResourceDefinitions.
 
-7. Check the workflow files:
+8. Check the workflow files:
 
    ```bash
    actionlint .github/workflows/release.yaml .github/workflows/retention.yaml
@@ -312,7 +320,7 @@ Run each command from the repository root.
 
    Expected result: actionlint prints no output and exits with code 0. When ShellCheck is in your `PATH`, actionlint also checks the shell code inside the workflows.
 
-8. Check the shell scripts:
+9. Check the shell scripts:
 
    ```bash
    shellcheck scripts/version.sh scripts/retention.sh test/retention_test.sh

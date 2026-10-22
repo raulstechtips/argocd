@@ -73,6 +73,7 @@ jobs:
           helm plugin install "$RUNNER_TEMP/helm-unittest"
       - name: Test and render the chart
         run: |
+          helm repo add argo https://argoproj.github.io/argo-helm
           helm dependency build charts
           helm lint --strict charts
           helm lint --strict charts -f charts/ci/all-on-values.yaml
@@ -168,6 +169,7 @@ jobs:
           echo "$RUNNER_TEMP/helm-bin" >> "$GITHUB_PATH"
       - name: Package the chart
         run: |
+          helm repo add argo https://argoproj.github.io/argo-helm
           helm dependency build charts
           helm package charts --version "$VERSION"
       - name: Log in to GHCR
