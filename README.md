@@ -74,29 +74,34 @@ If you turn on a resource and you do not set a required value, `helm template` s
 
 ## 4. Branch rule
 
+The workflow runs only for pushes to `main` and to branches that start with `feature/`, `bugfix/`, `hotfix/` or `release/`.
+Other branches get no CI run.
 Each branch other than `main` must match this regular expression:
 
 ```
-^([a-z0-9]+(-[a-z0-9]+)*)/([A-Z][A-Z0-9]*-[0-9]+)(-.*)?$
+^(feature|bugfix|hotfix|release)/([A-Z][A-Z0-9]*-[0-9]+)(-.*)?$
 ```
 
 The format is `<type>/<KEY>-<number>[-text]`.
 
-- `<type>` is lowercase letters, digits and hyphens. Examples: `feature`, `fix`, `spike`.
+- `<type>` is one of these four words: `feature`, `bugfix`, `hotfix`, `release`.
 - `<KEY>-<number>` is the ticket key in uppercase.
 - `-text` is optional.
 
 | Branch | Result | Reason |
 | --- | --- | --- |
 | `feature/DEVSECOPS-54-argocd-chart` | Good | Type, key and text are correct. |
-| `spike/OPS-7` | Good | Text is optional. |
+| `bugfix/OPS-7` | Good | Text is optional. |
+| `hotfix/DEVSECOPS-12-fix` | Good | Type, key and text are correct. |
+| `release/DEVSECOPS-60` | Good | Text is optional. |
+| `spike/OPS-7` | Bad | The type is not one of the four allowed types. |
 | `feature/no-key` | Bad | The branch has no ticket key. |
 | `Feature/DEVSECOPS-1` | Bad | The type has an uppercase letter. |
 
-If the branch name is bad, the `version` job fails with this message:
+If the branch starts with an allowed type but the name is bad, the `version` job fails with this message:
 
 ```
-Branch "<name>" must be <type>/<KEY>-<number>[-text], for example feature/DEVSECOPS-54-argocd-chart.
+Branch "<name>" must be <type>/<KEY>-<number>[-text]. The type must be feature, bugfix, hotfix or release. Example: feature/DEVSECOPS-54-argocd-chart.
 ```
 
 To fix the name, rename the branch. Then push the branch again:

@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BRANCH_RE='^([a-z0-9]+(-[a-z0-9]+)*)/([A-Z][A-Z0-9]*-[0-9]+)(-.*)?$'
+BRANCH_RE='^(feature|bugfix|hotfix|release)/([A-Z][A-Z0-9]*-[0-9]+)(-.*)?$'
 MAIN_RE='^[0-9]+\.[0-9]+\.[0-9]+-main-[0-9a-f]{7}-[0-9]+$'
 if [[ "$GITHUB_REF_NAME" == main ]]; then
   TYPE=main
 elif [[ "$GITHUB_REF_NAME" =~ $BRANCH_RE ]]; then
-  TYPE="${BASH_REMATCH[1]}-${BASH_REMATCH[3],,}"
+  TYPE="${BASH_REMATCH[1]}-${BASH_REMATCH[2],,}"
 else
-  printf '::error::Branch "%s" must be <type>/<KEY>-<number>[-text], for example feature/DEVSECOPS-54-argocd-chart.\n' "$GITHUB_REF_NAME"
+  printf '::error::Branch "%s" must be <type>/<KEY>-<number>[-text]. The type must be feature, bugfix, hotfix or release. Example: feature/DEVSECOPS-54-argocd-chart.\n' "$GITHUB_REF_NAME"
   exit 1
 fi
 
