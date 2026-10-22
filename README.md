@@ -1,0 +1,2 @@
+# argocd
+Standalone ArgoCD Repo
