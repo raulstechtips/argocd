@@ -1,0 +1,47 @@
+name: retention
+
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Only print decisions, do not delete
+        type: boolean
+        default: true
+  push:
+    paths:
+      - '.github/workflows/retention.yaml'
+      - 'scripts/retention.sh'
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: retention
+  cancel-in-progress: false
+
+jobs:
+  retention:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Delete branch chart versions older than 7 days
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          DRY_RUN_INPUT: ${{ inputs.dry_run }}
+        run: |
+          # push is ALWAYS a dry run; unknown events fall back to dry run.
+          case "$EVENT_NAME" in
+            schedule) mode=--apply ;;
+            workflow_dispatch)
+              if [ "$DRY_RUN_INPUT" = "false" ]; then mode=--apply; else mode=--dry-run; fi ;;
+            *) mode=--dry-run ;;
+          esac
+          echo "Mode: $mode"
+          bash scripts/retention.sh "$mode"
