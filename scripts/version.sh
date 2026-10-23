@@ -31,7 +31,8 @@ if [[ -z ${CHART_CHANGED+x} ]]; then
     COMPARE=$(git merge-base HEAD origin/main)
   fi
   if [[ -z ${CHART_CHANGED+x} ]]; then
-    CHANGED=$(git diff --name-only "$COMPARE" HEAD -- charts/)
+    # Chart tests and CI values do not change the published chart.
+    CHANGED=$(git diff --name-only "$COMPARE" HEAD -- charts/ ':(exclude)charts/tests' ':(exclude)charts/ci')
     CHART_CHANGED=false
     if [[ -n "$CHANGED" ]]; then
       CHART_CHANGED=true

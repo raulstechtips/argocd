@@ -17,16 +17,32 @@ on:
 
 permissions:
   contents: read
-  packages: write
 
 concurrency:
   group: retention
   cancel-in-progress: false
 
 jobs:
-  retention:
+  test:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      # A broken classifier stops the run before any job can delete.
+      - name: Test the retention script
+        run: bash test/retention_test.sh
+
+  # Only this job can delete. push and unknown events never reach it.
+  retention-apply:
+    needs: test
+    if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.dry_run == false) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
@@ -34,15 +50,21 @@ jobs:
       - name: Delete branch chart versions older than 7 days
         env:
           GH_TOKEN: ${{ github.token }}
-          EVENT_NAME: ${{ github.event_name }}
-          DRY_RUN_INPUT: ${{ inputs.dry_run }}
-        run: |
-          # push is ALWAYS a dry run; unknown events fall back to dry run.
-          case "$EVENT_NAME" in
-            schedule) mode=--apply ;;
-            workflow_dispatch)
-              if [ "$DRY_RUN_INPUT" = "false" ]; then mode=--apply; else mode=--dry-run; fi ;;
-            *) mode=--dry-run ;;
-          esac
-          echo "Mode: $mode"
-          bash scripts/retention.sh "$mode"
+        run: bash scripts/retention.sh --apply
+
+  retention-dry-run:
+    needs: test
+    if: ${{ !(github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.dry_run == false)) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Print retention decisions without deleting
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/retention.sh --dry-run

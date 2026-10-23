@@ -320,7 +320,7 @@ Run each command from the repository root.
 8. Check the workflow files:
 
    ```bash
-   actionlint .github/workflows/release.yaml .github/workflows/retention.yaml
+   actionlint .github/workflows/*.yaml
    ```
 
    Expected result: actionlint prints no output and exits with code 0. When ShellCheck is in your `PATH`, actionlint also checks the shell code inside the workflows.
@@ -328,7 +328,7 @@ Run each command from the repository root.
 9. Check the shell scripts:
 
    ```bash
-   shellcheck scripts/version.sh scripts/retention.sh test/retention_test.sh
+   shellcheck scripts/*.sh test/*.sh
    ```
 
    Expected result: ShellCheck prints no output and exits with code 0.
@@ -336,7 +336,7 @@ Run each command from the repository root.
 ### 8.3 Trivy
 
 CI scans `rendered.yaml` with Trivy for HIGH and CRITICAL misconfigurations.
-Trivy is a warning only. It does not stop the release.
+The Trivy step runs with `exit-code: 0`. Findings show as warnings and never fail the release.
 The job summary shows the Trivy table and a warning with the number of findings.
 Read the findings. Fix them when you can.
 
@@ -350,6 +350,10 @@ The `retention` workflow runs one time each day.
 | Branch version 7 days old or newer | Kept. |
 | `main` version (`X.Y.Z-main-<sha7>-<run#>`) | Always kept. |
 | Untagged version | Kept. The job writes a notice. |
+
+CI lints and tests the retention scripts: `shellcheck scripts/*.sh test/*.sh`, `actionlint .github/workflows/*.yaml` and `bash test/retention_test.sh` run in the `test` job of `release.yaml`.
+The `retention` workflow also runs `bash test/retention_test.sh` first. A failed test stops the run before any delete.
+Only the scheduled run and a manual run with `dry_run` set to `false` get `packages: write`. All other runs get `packages: read`.
 
 A push that changes `retention.yaml` or `scripts/retention.sh` runs the job in dry-run mode only.
 To run the job by hand, open **Actions > retention > Run workflow**. The `dry_run` input is `true` by default.
