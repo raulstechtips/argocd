@@ -52,6 +52,24 @@ tests:
       - equal:
           path: metadata.annotations["kubernetes.io/ingress.class"]
           value: other-class
+  - it: omits the ingress class annotation when empty
+    set:
+      ingressRoute.enabled: true
+      ingressRoute.host: argocd.example.test
+      ingressRoute.tlsSecretName: fake-tls
+      ingressRoute.ingressClass: ""
+    asserts:
+      - isNull:
+          path: metadata.annotations
+  - it: fails when entryPoints is empty
+    set:
+      ingressRoute.enabled: true
+      ingressRoute.host: argocd.example.test
+      ingressRoute.tlsSecretName: fake-tls
+      ingressRoute.entryPoints: null
+    asserts:
+      - failedTemplate:
+          errorMessage: ingressRoute.entryPoints is required when ingressRoute.enabled is true
   - it: fails when enabled without host
     set:
       ingressRoute.enabled: true

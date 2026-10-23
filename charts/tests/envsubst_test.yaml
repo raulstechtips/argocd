@@ -111,6 +111,9 @@ tests:
       - equal:
           path: spec.managedKubeSecretReferences[0].template.data.ARGOCD_ENV_DOMAIN
           value: "{{ .DOMAIN.Value }}"
+      - equal:
+          path: spec.managedKubeSecretReferences[0].template.data.ARGOCD_ENV_INFISICAL_PROD_HOST_API
+          value: "https://{{ .INFISICAL_APP.Value }}.{{ .DOMAIN.Value }}/api"
 
   - it: renders the harbor InfisicalSecret with the 3 values
     set: *on
@@ -132,6 +135,21 @@ tests:
       - equal:
           path: spec.authentication.universalAuth.secretsScope.envSlug
           value: fake-env
+
+  - it: targets the release namespace in both secrets
+    set:
+      <<: *on
+    release:
+      namespace: other
+    asserts:
+      - equal:
+          path: spec.managedKubeSecretReferences[0].secretNamespace
+          value: other
+        template: templates/envsubst/app-env-secret.yaml
+      - equal:
+          path: spec.managedKubeSecretReferences[0].secretNamespace
+          value: other
+        template: templates/envsubst/harbor-secret.yaml
 
   # Helm stops at the first failing template; harbor-secret.yaml is the one it reports.
   - it: fails without hostAPI
