@@ -267,6 +267,7 @@ Run each command from the repository root.
    ```
 
    Expected result: `"argo" has been added to your repositories`.
+   If you added the repository before, Helm prints `"argo" already exists with the same configuration, skipping`. The command exits with code 0 in both cases.
 
 2. Download the chart dependencies:
 
@@ -298,7 +299,7 @@ Run each command from the repository root.
    helm unittest charts
    ```
 
-   Expected result: the summary lines `Test Suites:` and `Tests:` show only `passed` values. Example: `Tests: 16 passed, 16 total`.
+   Expected result: the summary lines `Test Suites:` and `Tests:` show only `passed` values. Example: `Tests: 19 passed, 19 total`.
 
 6. Render the chart with all features on:
 
