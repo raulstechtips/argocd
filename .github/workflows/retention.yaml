@@ -9,11 +9,6 @@ on:
         description: Only print decisions, do not delete
         type: boolean
         default: true
-  push:
-    branches: [main, 'feature/**', 'bugfix/**', 'hotfix/**', 'release/**']
-    paths:
-      - '.github/workflows/retention.yaml'
-      - 'scripts/retention.sh'
 
 permissions:
   contents: read
@@ -23,20 +18,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-
-      # A broken classifier stops the run before any job can delete.
-      - name: Test the retention script
-        run: bash test/retention_test.sh
-
-  # Only this job can delete. push and unknown events never reach it.
+  # Only this job can delete: the daily schedule, or a manual run with dry_run set to false.
   retention-apply:
-    needs: test
     if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.dry_run == false) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -53,7 +36,6 @@ jobs:
         run: bash scripts/retention.sh --apply
 
   retention-dry-run:
-    needs: test
     if: ${{ !(github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.dry_run == false)) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10

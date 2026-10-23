@@ -22,7 +22,7 @@ oci://ghcr.io/raulstechtips/charts/argocd
 | `charts/templates/envsubst/` | The envsubst CMP plugin resources. This directory is temporary. Section 11 tells you how to remove it. |
 | `charts/tests/` | The helm-unittest test files (`*_test.yaml`). |
 | `charts/ci/` | Values files for CI. `all-on-values.yaml` turns on all features with fake values. |
-| `.github/workflows/` | `release.yaml` tests, versions and publishes the chart. `retention.yaml` deletes old branch versions. |
+| `.github/workflows/` | `main.yaml` is the pipeline. It calls `test.yaml`, then `scan.yaml`, then `release.yaml` (version and publish). `retention.yaml` deletes old branch versions each night. |
 | `scripts/` | Shell scripts for the workflows. `retention.sh` contains the retention logic. |
 
 ## 3. Values layout
@@ -161,13 +161,14 @@ Each push to a valid branch publishes one chart version to:
 oci://ghcr.io/raulstechtips/charts/argocd
 ```
 
-The `publish` job runs only when the `version` and `test` jobs pass.
-The job summary shows the full chart address and version.
+The `main` workflow runs 3 stages in this order: `test`, `scan`, `publish`.
+The `publish` stage runs only when `test` passes. A scan finding does not stop it (section 8.3).
+The `publish` stage computes the version, then pushes the chart. Its job summary shows the full chart address and version.
 
 ### 7.1 Render a branch build
 
-1. Open the workflow run in GitHub Actions.
-2. Open the `publish` job summary.
+1. Open the `main` workflow run in GitHub Actions.
+2. Open the `publish / publish` job summary.
 3. Copy the version. Example: `3.0.0-feature-devsecops-54-abc1234-12`.
 4. Log in to GHCR if the package is private:
 
@@ -336,14 +337,14 @@ Run each command from the repository root.
 
 ### 8.3 Trivy
 
-CI scans `rendered.yaml` with Trivy for HIGH and CRITICAL misconfigurations.
-The Trivy step runs with `exit-code: 0`. Findings show as warnings and never fail the release.
-The job summary shows the Trivy table and a warning with the number of findings.
+The `scan` workflow scans the `rendered.yaml` that the `test` workflow uploads. It looks for HIGH and CRITICAL misconfigurations with Trivy.
+The Trivy step runs with `exit-code: 0`. Findings show as a warning on the run. They never stop the `publish` stage.
+The `scan / trivy` job summary shows the Trivy table and the number of findings.
 Read the findings. Fix them when you can.
 
 ## 9. Retention
 
-The `retention` workflow runs one time each day.
+The `retention` workflow runs one time each day, at 03:17 UTC (`cron: '17 3 * * *'`). A push does not start it.
 
 | Version type | Rule |
 | --- | --- |
@@ -351,13 +352,13 @@ The `retention` workflow runs one time each day.
 | Branch version 7 days old or newer | Kept. |
 | `main` version (`X.Y.Z-main-<sha7>-<run#>`) | Always kept. |
 | Untagged version | Kept. The job writes a notice. |
+| Any other tag (`3.0.0`, `latest`, an unknown shape) | Always kept. Only a dated branch build can be deleted. |
 
-CI lints and tests the retention scripts: `shellcheck scripts/*.sh test/*.sh`, `actionlint .github/workflows/*.yaml` and `bash test/retention_test.sh` run in the `test` job of `release.yaml`.
-The `retention` workflow also runs `bash test/retention_test.sh` first. A failed test stops the run before any delete.
-Only the scheduled run and a manual run with `dry_run` set to `false` get `packages: write`. All other runs get `packages: read`.
+`test/retention_test.sh` is the unit test of `scripts/retention.sh`. It feeds fake version lists to the script and checks each KEEP or DELETE decision. It never calls GHCR.
+The `test` workflow runs it on each push, together with `shellcheck` and `actionlint`. A change that breaks the delete rule therefore fails before it reaches `main`, and the nightly run uses only the code on `main`.
+Only the scheduled run and a manual run with `dry_run` set to `false` get `packages: write`. A manual dry run gets `packages: read`.
 
-A push that changes `retention.yaml` or `scripts/retention.sh` runs the job in dry-run mode only.
-To run the job by hand, open **Actions > retention > Run workflow**. The `dry_run` input is `true` by default.
+To run the job by hand, open **Actions > retention > Run workflow**. The `dry_run` input is `true` by default. A dry run only prints the decisions.
 
 ## 10. Operator note: GHCR package settings
 
