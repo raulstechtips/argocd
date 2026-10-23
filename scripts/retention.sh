@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Delete branch-build chart versions older than 7 days from GHCR.
+# Delete dated branch-build chart versions (every tag made by CI branch builds) older than 7 days from GHCR.
+# Keep everything else: untagged, main, release, manual and unrecognised tags.
 # Usage: scripts/retention.sh --dry-run|--apply   (reads GH_TOKEN for gh)
 # Test hooks (offline): RETENTION_VERSIONS_FILE=<json file> skips the list API call;
 #                       RETENTION_NOW=<epoch seconds> replaces the current time.
@@ -8,7 +9,10 @@ set -euo pipefail
 # raulstechtips is a GitHub organization: use the orgs API path. The user-scoped path returns 404 for an org.
 PKG_OWNER_PATH="orgs/raulstechtips"
 OWNER_PATH="/${PKG_OWNER_PATH}/packages/container/charts%2Fargocd/versions"
-MAIN_RE='^[0-9]+\.[0-9]+\.[0-9]+-main-[0-9a-f]{7}-[0-9]+$'
+# Dated branch build as scripts/version.sh makes it: X.Y.Z-<type>-<key>-<number>-<sha7>-<run>.
+BRANCH_BUILD_RE='^[0-9]+\.[0-9]+\.[0-9]+-(feature|bugfix|hotfix|release)-[a-z][a-z0-9]*-[0-9]+-[0-9a-f]{7}-[0-9]+$'
+# Explicit guard: a tag that ends in the main shape is never deleted.
+MAIN_GUARD_RE='-main-[0-9a-f]{7}-[0-9]+$'
 MAX_AGE_SECONDS=604800
 
 mode="${1:-}"
@@ -57,18 +61,20 @@ else
   now="$(jq -n 'now | floor')"
 fi
 
-jq -r --argjson now "$now" --arg re "$MAIN_RE" --argjson max "$MAX_AGE_SECONDS" '
+jq -r --argjson now "$now" --arg re "$BRANCH_BUILD_RE" --arg guard "$MAIN_GUARD_RE" --argjson max "$MAX_AGE_SECONDS" '
   .[] |
   (.metadata.container.tags) as $tags |
   (.created_at | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601) as $created |
   (if ($tags | length) == 0 then
      ["KEEP", "untagged version kept (never deleted)"]
-   elif any($tags[]; test($re)) then
+   elif any($tags[]; test($guard)) then
      ["KEEP", "has main release tag"]
+   elif any($tags[]; test($re) | not) then
+     ["KEEP", "has a tag that is not a dated branch build"]
    elif ($now - $created) > $max then
-     ["DELETE", "branch build older than 7 days"]
+     ["DELETE", "dated branch build older than 7 days"]
    else
-     ["KEEP", "branch build newer than 7 days"]
+     ["KEEP", "dated branch build newer than 7 days"]
    end) as $d |
   [$d[0], (.id | tostring), ($tags | join(",")), .created_at, $d[1]] | join("|")' \
   "$work/versions.json" >"$work/decisions.txt"

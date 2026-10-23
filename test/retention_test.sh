@@ -98,6 +98,31 @@ check "list uses orgs path" "$(grep -c '^api --paginate /orgs/raulstechtips/pack
 check "delete uses orgs path" "$(grep -c '^api --method DELETE /orgs/raulstechtips/packages/container/charts%2Fargocd/versions/10[45]$' "$STUB_LOG")" 2
 check "script has no /users/ path" "$(grep -c 'users/' "$script" || true)" 0
 
+# 8b fail-safe classifier: only dated branch builds can be deleted. Every other shape is KEEP.
+extra="$T/extra.json"
+mk() { jq -n --argjson id "$1" --arg c "$2" --argjson tags "$3" '{id:$id,created_at:$c,metadata:{container:{tags:$tags}}}'; }
+{
+  mk 301 2026-09-01T10:00:00Z '["3.0.0"]'
+  mk 302 2026-09-01T10:00:00Z '["latest"]'
+  mk 303 2026-09-01T10:00:00Z '["v3.0.0"]'
+  mk 304 2026-09-01T10:00:00Z '["3.0.0-feature-devsecops-54-abc1234"]'
+  mk 305 2026-09-01T10:00:00Z '[]'
+  mk 306 2026-09-01T10:00:00Z '["3.0.0-main-abc1234-7","latest"]'
+  mk 307 2026-09-01T10:00:00Z '["3.0.0-feature-devsecops-54-abc1234-7"]'
+  mk 308 2026-10-21T10:00:00Z '["3.0.0-feature-devsecops-54-abc1234-7"]'
+  mk 309 2026-09-01T10:00:00Z '["3.0.0-feature-devsecops-54-abc1234-7","latest"]'
+  mk 310 2026-09-01T10:00:00Z '["3.0.0-feature-devsecops-54-abc1234-7","3.0.0-bugfix-devsecops-54-def5678-8"]'
+} | jq -s '.' >"$extra"
+RETENTION_VERSIONS_FILE="$extra" run bash "$script" --dry-run
+check "classifier rc" "$rc" 0
+for id in 301 302 303 304 305 306 308 309; do
+  check "classifier KEEP $id" "$(echo "$out" | grep -c "KEEP id=$id ")" 1
+done
+check "classifier would-delete 307+310" "$(echo "$out" | grep '^would-delete' | sed -E 's/^would-delete id=([0-9]+).*/\1/' | tr '\n' ' ')" "307 310 "
+STUB_FIXTURE="$extra" run bash "$script" --apply
+check "classifier apply rc" "$rc" 0
+check "classifier apply DELETE ids" "$(delids)" "307 310 "
+
 # 9 mode argument required
 run bash "$script"
 check "no mode rc" "$rc" 2
