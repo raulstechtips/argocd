@@ -1,0 +1,80 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "infisical": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "authRef": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "namespace"],
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "namespace": { "type": "string", "minLength": 1 }
+          }
+        },
+        "projectSlug": { "type": "string" }
+      }
+    },
+    "externalRegistrySecrets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "environmentSlug", "secretPath", "url", "usernameKey", "passwordKey"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1, "maxLength": 253, "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$" },
+          "environmentSlug": { "type": "string", "minLength": 1 },
+          "secretPath": { "type": "string", "minLength": 1 },
+          "url": { "type": "string", "minLength": 1 },
+          "usernameKey": { "type": "string", "minLength": 1, "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" },
+          "passwordKey": { "type": "string", "minLength": 1, "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" },
+          "type": { "type": "string", "enum": ["helm", "git"], "default": "helm" },
+          "enableOCI": { "type": "boolean" }
+        }
+      }
+    },
+    "ingressRoute": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "host": { "type": "string" },
+        "ingressClass": { "type": "string" },
+        "entryPoints": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "middlewares": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name"],
+            "properties": {
+              "name": { "type": "string" },
+              "namespace": { "type": "string" }
+            }
+          }
+        },
+        "tlsSecretName": { "type": "string" }
+      }
+    },
+    "envsubst": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean", "default": false },
+        "infisical": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "hostAPI": { "type": "string" },
+            "projectSlug": { "type": "string" },
+            "envSlug": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}

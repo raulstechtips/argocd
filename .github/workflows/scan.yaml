@@ -1,0 +1,53 @@
+name: scan
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  trivy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Download the rendered manifests
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: rendered-manifests
+          path: ${{ runner.temp }}/manifests
+      - name: Install Trivy
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/trivy.tar.gz" \
+            https://github.com/aquasecurity/trivy/releases/download/v0.70.0/trivy_0.70.0_Linux-64bit.tar.gz
+          echo "8b4376d5d6befe5c24d503f10ff136d9e0c49f9127a4279fd110b727929a5aa9  $RUNNER_TEMP/trivy.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/trivy.tar.gz" -C "$RUNNER_TEMP" trivy
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+      - name: Scan rendered manifests
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: v0.70.0
+          skip-setup-trivy: 'true'
+          cache: 'false'
+          scan-type: config
+          scan-ref: ${{ runner.temp }}/manifests
+          severity: HIGH,CRITICAL
+          exit-code: '0'
+          format: table
+          output: ${{ runner.temp }}/trivy.txt
+      - name: Report scan findings
+        run: |
+          COUNT=$(awk '/^Failures: / {total += $2} END {print total+0}' "$RUNNER_TEMP/trivy.txt")
+          if [ "$COUNT" -gt 0 ]; then
+            echo "::warning::Trivy found $COUNT misconfigurations"
+          fi
+          {
+            echo "### Trivy: $COUNT HIGH or CRITICAL misconfigurations"
+            echo '```text'
+            cat "$RUNNER_TEMP/trivy.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

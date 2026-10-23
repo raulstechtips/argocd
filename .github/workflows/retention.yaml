@@ -1,0 +1,52 @@
+name: retention
+
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Only print decisions, do not delete
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: retention
+  cancel-in-progress: false
+
+jobs:
+  # Only this job can delete: the daily schedule, or a manual run with dry_run set to false.
+  retention-apply:
+    if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.dry_run == false) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Delete branch chart versions older than 7 days
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/retention.sh --apply
+
+  retention-dry-run:
+    if: ${{ !(github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.dry_run == false)) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Print retention decisions without deleting
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/retention.sh --dry-run

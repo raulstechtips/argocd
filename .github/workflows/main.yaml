@@ -1,0 +1,29 @@
+name: main
+
+# One pipeline: test, then scan, then publish.
+# The scan only warns. A HIGH or CRITICAL finding does not stop the publish.
+on:
+  push:
+    branches: [main, 'feature/**', 'bugfix/**', 'hotfix/**', 'release/**']
+    tags-ignore: ['**']
+  workflow_dispatch:
+
+concurrency: main-${{ github.ref }}
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    uses: ./.github/workflows/test.yaml
+
+  scan:
+    needs: test
+    uses: ./.github/workflows/scan.yaml
+
+  publish:
+    needs: scan
+    uses: ./.github/workflows/release.yaml
+    permissions:
+      contents: read
+      packages: write

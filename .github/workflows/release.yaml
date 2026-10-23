@@ -1,0 +1,83 @@
+name: release
+
+on:
+  workflow_call:
+    outputs:
+      version:
+        description: The published chart version
+        value: ${{ jobs.version.outputs.version }}
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+      - name: Install version tools
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/oras.tar.gz" \
+            https://github.com/oras-project/oras/releases/download/v1.2.3/oras_1.2.3_linux_amd64.tar.gz
+          echo "b4efc97a91f471f323f193ea4b4d63d8ff443ca3aab514151a30751330852827  $RUNNER_TEMP/oras.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/oras.tar.gz" -C "$RUNNER_TEMP" oras
+          curl -fsSL -o "$RUNNER_TEMP/yq" \
+            https://github.com/mikefarah/yq/releases/download/v4.45.1/yq_linux_amd64
+          echo "654d2943ca1d3be2024089eb4f270f4070f491a0610481d128509b2834870049  $RUNNER_TEMP/yq" | sha256sum -c -
+          chmod +x "$RUNNER_TEMP/yq"
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+      - name: Log in for the version baseline
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          ACTOR: ${{ github.actor }}
+        run: echo "$GITHUB_TOKEN" | oras login ghcr.io -u "$ACTOR" --password-stdin
+      - name: Check and compute version
+        id: version
+        run: bash scripts/version.sh
+
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: version
+    permissions:
+      contents: read
+      packages: write
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - name: Install Helm
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/helm.tar.gz" \
+            https://get.helm.sh/helm-v3.18.4-linux-amd64.tar.gz
+          echo "f8180838c23d7c7d797b208861fecb591d9ce1690d8704ed1e4cb8e2add966c1  $RUNNER_TEMP/helm.tar.gz" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/helm-bin"
+          tar -xzf "$RUNNER_TEMP/helm.tar.gz" -C "$RUNNER_TEMP/helm-bin" --strip-components=1 linux-amd64/helm
+          echo "$RUNNER_TEMP/helm-bin" >> "$GITHUB_PATH"
+      - name: Package the chart
+        run: |
+          helm repo add argo https://argoproj.github.io/argo-helm
+          helm dependency build charts
+          helm package charts --version "$VERSION"
+      - name: Log in to GHCR
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          ACTOR: ${{ github.actor }}
+        run: echo "$GITHUB_TOKEN" | helm registry login ghcr.io -u "$ACTOR" --password-stdin
+      - name: Push and check the chart
+        run: |
+          helm push "argocd-$VERSION.tgz" oci://ghcr.io/raulstechtips/charts
+          helm show chart oci://ghcr.io/raulstechtips/charts/argocd --version "$VERSION"
+          echo "oci://ghcr.io/raulstechtips/charts/argocd:$VERSION" >> "$GITHUB_STEP_SUMMARY"
