@@ -117,8 +117,8 @@ The workflow makes the chart version. Do not write it into git.
 
 | Branch | Format | Example |
 | --- | --- | --- |
-| Other branch | `X.Y.Z-<type>-<lowercase key>-<sha7>-<run#>` | `3.0.0-feature-devsecops-54-abc1234-12` |
-| `main` | `X.Y.Z-main-<sha7>-<run#>` | `3.0.0-main-abc1234-13` |
+| Other branch | `X.Y.Z-<type>-<lowercase key>-<sha7>-<run#>` | `1.0.0-feature-devsecops-54-abc1234-12` |
+| `main` | `X.Y.Z-main-<sha7>-<run#>` | `1.0.0-main-abc1234-13` |
 
 - `X.Y.Z` is the `version` field in `charts/Chart.yaml`.
 - `<sha7>` is the first 7 characters of the commit SHA.
@@ -141,7 +141,7 @@ Do these steps when you change `charts/`:
    oras repo tags ghcr.io/raulstechtips/charts/argocd | grep -E '^[0-9]+\.[0-9]+\.[0-9]+-main-[0-9a-f]{7}-[0-9]+$' | sort -V | tail -n 1
    ```
 
-   Example result: `3.0.0-main-abc1234-13`.
+   Example result: `1.0.0-main-abc1234-13`.
 2. Open `charts/Chart.yaml`.
 3. Set `version` to a higher value. Example: `3.0.1`.
 4. Commit the change.
@@ -169,7 +169,7 @@ The `publish` stage computes the version, then pushes the chart. Its job summary
 
 1. Open the `main` workflow run in GitHub Actions.
 2. Open the `publish / publish` job summary.
-3. Copy the version. Example: `3.0.0-feature-devsecops-54-abc1234-12`.
+3. Copy the version. Example: `1.0.0-feature-devsecops-54-abc1234-12`.
 4. Log in to GHCR if the package is private:
 
    ```bash
@@ -352,7 +352,7 @@ The `retention` workflow runs one time each day, at 03:17 UTC (`cron: '17 3 * * 
 | Branch version 7 days old or newer | Kept. |
 | `main` version (`X.Y.Z-main-<sha7>-<run#>`) | Always kept. |
 | Untagged version | Kept. The job writes a notice. |
-| Any other tag (`3.0.0`, `latest`, an unknown shape) | Always kept. Only a dated branch build can be deleted. |
+| Any other tag (`1.0.0`, `latest`, an unknown shape) | Always kept. Only a dated branch build can be deleted. |
 
 `test/retention_test.sh` is the unit test of `scripts/retention.sh`. It feeds fake version lists to the script and checks each KEEP or DELETE decision. It never calls GHCR.
 The `test` workflow runs it on each push, together with `shellcheck` and `actionlint`. A change that breaks the delete rule therefore fails before it reaches `main`, and the nightly run uses only the code on `main`.
