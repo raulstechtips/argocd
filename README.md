@@ -330,7 +330,7 @@ Run each command from the repository root.
 9. Check the shell scripts:
 
    ```bash
-   shellcheck scripts/*.sh test/*.sh
+   shellcheck scripts/*.sh
    ```
 
    Expected result: ShellCheck prints no output and exits with code 0.
@@ -354,8 +354,6 @@ The `retention` workflow runs one time each day, at 03:17 UTC (`cron: '17 3 * * 
 | Untagged version | Kept. The job writes a notice. |
 | Any other tag (`1.0.0`, `latest`, an unknown shape) | Always kept. Only a dated branch build can be deleted. |
 
-`test/retention_test.sh` is the unit test of `scripts/retention.sh`. It feeds fake version lists to the script and checks each KEEP or DELETE decision. It never calls GHCR.
-The `test` workflow runs it on each push, together with `shellcheck` and `actionlint`. A change that breaks the delete rule therefore fails before it reaches `main`, and the nightly run uses only the code on `main`.
 Only the scheduled run and a manual run with `dry_run` set to `false` get `packages: write`. A manual dry run gets `packages: read`.
 
 To run the job by hand, open **Actions > retention > Run workflow**. The `dry_run` input is `true` by default. A dry run only prints the decisions.
