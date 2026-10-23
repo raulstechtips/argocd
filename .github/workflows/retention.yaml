@@ -10,7 +10,7 @@ on:
         type: boolean
         default: true
   push:
-    branches: ['**']
+    branches: [main, 'feature/**', 'bugfix/**', 'hotfix/**', 'release/**']
     paths:
       - '.github/workflows/retention.yaml'
       - 'scripts/retention.sh'
