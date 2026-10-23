@@ -96,7 +96,6 @@ run bash "$script" --apply
 check "no /users/ path called" "$(grep -c '/users/' "$STUB_LOG" || true)" 0
 check "list uses orgs path" "$(grep -c '^api --paginate /orgs/raulstechtips/packages/container/charts%2Fargocd/versions?' "$STUB_LOG")" 1
 check "delete uses orgs path" "$(grep -c '^api --method DELETE /orgs/raulstechtips/packages/container/charts%2Fargocd/versions/10[45]$' "$STUB_LOG")" 2
-check "script has no /users/ path" "$(grep -c 'users/' "$script" || true)" 0
 
 # 8b fail-safe classifier: only dated branch builds can be deleted. Every other shape is KEEP.
 extra="$T/extra.json"

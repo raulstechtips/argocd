@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Compare complete inventories. Exit 1 for missing objects, 2 for input errors.
+# Exit 1 for missing objects, 2 for input errors, 3 for added objects to classify.
 set -euo pipefail
 if [ "$#" -ne 2 ]; then
   echo "Usage: bash test/inventory-diff.sh expected.yaml rendered.yaml" >&2
@@ -53,14 +53,14 @@ while IFS= read -r object; do
           walk(if type == "object" and has("matchLabels") and
             .matchLabels["app.kubernetes.io/instance"] == "argocd"
             then del(.matchLabels["app.kubernetes.io/instance"]) else . end) |
-          .ingress |= map(
+          (.ingress, .egress) |= ((. // []) | map(
             if has("ports") then .ports |= map(
               .protocol = (.protocol // "TCP") |
               if (.port | type) == "string" then
                 .port = ($ports[.port] // error("Unresolved policy port"))
               else . end
             ) else . end
-          ) |
+          )) |
           walk(if type == "array" then sort_by(tojson)
             elif type == "object" then to_entries | sort_by(.key) | from_entries
             else . end);
@@ -88,5 +88,11 @@ done < "$tmp/missing"
 while IFS= read -r object; do
   printf 'ADDED %s: classify in the install proof\n' "$object"
 done < "$tmp/added"
-if [ "$rc" -eq 0 ]; then echo "PASS no unapproved missing objects"; fi
+added="$(wc -l < "$tmp/added" | tr -d ' ')"
+if [ "$added" -gt 0 ]; then
+  printf 'REVIEW %s added objects require classification\n' "$added"
+  if [ "$rc" -eq 0 ]; then rc=3; fi
+elif [ "$rc" -eq 0 ]; then
+  echo "PASS no unapproved missing or added objects"
+fi
 exit "$rc"

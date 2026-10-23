@@ -35,7 +35,10 @@ for input in live rendered; do
           )
         else . end);
     .spec |
-    del(.selector, .template.metadata.labels, .template.metadata.creationTimestamp) |
+    del(.template.metadata.creationTimestamp,
+      .template.metadata.labels["helm.sh/chart"],
+      .template.metadata.labels["app.kubernetes.io/version"],
+      .template.metadata.labels["app.kubernetes.io/managed-by"]) |
     .template.metadata.annotations = (.template.metadata.annotations // {}) |
     if .progressDeadlineSeconds == 600 then del(.progressDeadlineSeconds) else . end |
     if .strategy == {type:"RollingUpdate", rollingUpdate:{maxSurge:"25%", maxUnavailable:"25%"}}
@@ -75,11 +78,13 @@ jq -nr --slurpfile live "$tmp/live" --slurpfile rendered "$tmp/rendered" '
     ($old == "dex" and .name == "dex-server")
   ) | not) |
   "FIX missing container: " + $old
-'
+' > "$tmp/missing-containers"
+cat "$tmp/missing-containers"
 set +e
 diff -u --label "live $KIND/$NAME" --label "rendered $KIND/$NAME" \
   "$tmp/live-normalized" "$tmp/rendered-normalized"
 rc=$?
 set -e
+if [ -s "$tmp/missing-containers" ]; then rc=1; fi
 if [ "$rc" -eq 0 ]; then echo "PASS $KIND/$NAME workload fields match"; fi
 exit "$rc"

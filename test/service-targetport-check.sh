@@ -41,5 +41,5 @@ jq -r '
     end
   ] | if length == 0 then ["FIX input contains no Services"] else . end | .[]
 ' "$tmp/objects" > "$tmp/result" || exit 2
-while IFS= read -r line; do printf '%s\n' "$line"; done < "$tmp/result"
+cat "$tmp/result"
 if grep -q '^FIX ' "$tmp/result"; then exit 1; fi
