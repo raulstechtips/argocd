@@ -9,8 +9,9 @@ set -euo pipefail
 # raulstechtips is a GitHub organization: use the orgs API path. The user-scoped path returns 404 for an org.
 PKG_OWNER_PATH="orgs/raulstechtips"
 OWNER_PATH="/${PKG_OWNER_PATH}/packages/container/charts%2Fargocd/versions"
-# Dated branch build as scripts/version.sh makes it: X.Y.Z-<type>-<key>-<number>-<sha7>-<run>.
-BRANCH_BUILD_RE='^[0-9]+\.[0-9]+\.[0-9]+-(feature|bugfix|hotfix|release)-[a-z][a-z0-9]*-[0-9]+-[0-9a-f]{7}-[0-9]+$'
+# Dated branch build: X.Y.Z-<type>-<key>-<number>-<sha7>-<run> (scripts/version.sh and Jenkins branch builds)
+# or X.Y.Z-<type>-<key>-<number>-<head7>-<base7>-<run> (Jenkins PR builds).
+BRANCH_BUILD_RE='^[0-9]+\.[0-9]+\.[0-9]+-(feature|bugfix|hotfix|release)-[a-z][a-z0-9]*-[0-9]+-[0-9a-f]{7}(-[0-9a-f]{7})?-[0-9]+$'
 # Explicit guard: a tag that ends in the main shape is never deleted.
 MAIN_GUARD_RE='-main-[0-9a-f]{7}-[0-9]+$'
 MAX_AGE_SECONDS=604800
