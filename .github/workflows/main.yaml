@@ -1,11 +1,9 @@
 name: main
 
-# One pipeline: test, then scan, then publish.
+# Manual backup pipeline: Jenkins builds this repo with the shared library (see Jenkinsfile).
+# Run this workflow by hand only when Jenkins is unavailable: test, then scan, then publish.
 # The scan only warns. A HIGH or CRITICAL finding does not stop the publish.
 on:
-  push:
-    branches: [main, 'feature/**', 'bugfix/**', 'hotfix/**', 'release/**']
-    tags-ignore: ['**']
   workflow_dispatch:
 
 concurrency: main-${{ github.ref }}
