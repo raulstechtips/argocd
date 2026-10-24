@@ -1,0 +1,15 @@
+project-config:
+  project-name: argocd
+  project-description: "Helm chart that installs Argo CD in the cluster"
+  project-namespace: argocd
+  publish-targets: [ghcr]
+  pipeline-steps:
+    helm-test: true
+    unit-test: false
+    trivy-scan: true
+    opengrep-scan: true
+    build-docker-image: false
+    helm-package-upload: true
+    helm-install: false
+    helm-clean-install: false
+    argo-deploy: true
