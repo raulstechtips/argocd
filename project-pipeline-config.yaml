@@ -2,7 +2,7 @@ project-config:
   project-name: argocd
   project-description: "Helm chart that installs Argo CD in the cluster"
   project-namespace: argocd
-  publish-targets: [ghcr]
+  publish-targets: [harbor]
   pipeline-steps:
     helm-test: true
     unit-test: false
