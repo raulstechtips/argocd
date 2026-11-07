@@ -1,0 +1,24 @@
+suite: argocd-cm resource exclusions
+templates:
+  - charts/argo-cd/templates/argocd-configs/argocd-cm.yaml
+tests:
+  - it: lets Argo CD manage Endpoints
+    asserts:
+      - notMatchRegex:
+          path: data["resource.exclusions"]
+          pattern: (?m)^\s*- Endpoints$
+      - notMatchRegex:
+          path: data["resource.exclusions"]
+          pattern: (?m)^\s*- ''$
+
+  - it: keeps EndpointSlice and the other chart defaults excluded
+    asserts:
+      - matchRegex:
+          path: data["resource.exclusions"]
+          pattern: (?m)^\s*- EndpointSlice$
+      - matchRegex:
+          path: data["resource.exclusions"]
+          pattern: (?m)^\s*- Lease$
+      - matchRegex:
+          path: data["resource.exclusions"]
+          pattern: (?m)^\s*- CertificateRequest$
